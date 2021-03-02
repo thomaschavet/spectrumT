@@ -60,5 +60,5 @@ for e in results:
         i = i + 1
     resultsdistr[i-1] = resultsdistr[i-1] + 1/numtest
 print(resultsdistr)
-err = (max(results)-min(results))/(max(results)+min(results)*100)#in %
+err = (max(results)-min(results))/(max(results)+min(results))*100#in %
 print(err)
