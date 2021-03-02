@@ -1,9 +1,5 @@
 import csv
-import mpmath
-import math
-import os
-import sys
-import pathlib
+from function import efromT
 
 wl = []
 I = []
@@ -15,32 +11,6 @@ with open('ps100mbar_T7000K_lambda300-900nm.csv') as csvfile:
 wl.pop(0)
 I.pop(0)
 
-path = pathlib.Path(__file__).parent.absolute()
-
-def efromT(T, atom_spec, g, Eu, Au, El):
-    numfract = os.popen('''export MPP_DIRECTORY='''+str(path)+'''/Mutationpp
-          export MPP_DATA_DIRECTORY=$MPP_DIRECTORY/data
-          export PATH=$MPP_DIRECTORY/install/bin:$PATH
-          export LD_LIBRARY_PATH=$MPP_DIRECTORY/install/lib:$LD_LIBRARY_PATH
-          '''+str(path)+'''/Mutationpp/src/general/mppequil --no-header -T ''' + str(T) + ''' -P 10000 -m 4 -s 0 plasmatron''').read().split()
-    n = float(numfract[0])
-    if atom_spec == 'O':
-        XO = float(numfract[12])
-        ng = n*XO
-        Qint = 5 + 3*mpmath.exp(-15826.5*mtoJ/(Kb*T)) + 1*mpmath.exp(-22697.7*mtoJ/(Kb*T)) + 5*mpmath.exp(-1586786.2*mtoJ/(Kb*T)) + 1*mpmath.exp(-3379258.3*mtoJ/(Kb*T)) + 5*mpmath.exp(-7376820.0*mtoJ/(Kb*T)) 
-    elif atom_spec == 'N':
-        XN = float(numfract[11])
-        ng = n*XN
-        Qint = 4 + 6*mpmath.exp(-1922446.4*mtoJ/(Kb*T)) + 4*mpmath.exp(-1923317.7*mtoJ/(Kb*T)) + 2*mpmath.exp(-2883892*mtoJ/(Kb*T)) + 4*mpmath.exp(-2883930.6*mtoJ/(Kb*T))
-    else:
-        sys.exit("atom_spec must be 'O' or 'N' !")
-    #print(Qint)
-    ecalc = 0
-    for i in range(len(g)):
-        nu = ng*g[i]*mpmath.exp(-Eu[i]/(Kb*T))/Qint
-        e = (Eu[i]-El[i])/(4*math.pi) * Au[i]*nu
-        ecalc = ecalc + e
-    return ecalc
 
 def efromSpectr(start, end):
     #find closest to start and end
@@ -74,7 +44,7 @@ def efromSpectr(start, end):
 #CONSTANT:
 mtoJ = 1.986445857E-25
 Kb = 1.38064852E-23
-
+P = 10000
 
 '''Oxygen I'''
 
@@ -89,7 +59,7 @@ T = 7000 #[K]
 
 err = 1000
 while abs(err) > 1E-5:
-    ecalc = efromT(T, 'O', g, Eu, Au, El)
+    ecalc = efromT(T, P, 'O', g, Eu, Au, El)
     err = emeas - ecalc
     eta = 1
     T = T + eta*err
@@ -110,7 +80,7 @@ T = 7000 #[K]
 
 err = 1000
 while abs(err) > 1E-5:
-    ecalc = efromT(T, 'O', g, Eu, Au, El)
+    ecalc = efromT(T, P, 'O', g, Eu, Au, El)
     err = emeas - ecalc
     eta = 1
     T = T + eta*err
@@ -130,7 +100,7 @@ T = 7000 #[K]
 
 err = 1000
 while abs(err) > 1E-5:
-    ecalc = efromT(T, 'N', g, Eu, Au, El)
+    ecalc = efromT(T, P, 'N', g, Eu, Au, El)
     err = emeas - ecalc
     eta = 1
     T = T + eta*err
@@ -150,7 +120,7 @@ T = 7000 #[K]
 
 err = 1000
 while abs(err) > 1E-5:
-    ecalc = efromT(T, 'N', g, Eu, Au, El)
+    ecalc = efromT(T, P, 'N', g, Eu, Au, El)
     err = emeas - ecalc
     eta = 1
     T = T + eta*err
