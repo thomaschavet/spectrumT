@@ -1,43 +1,52 @@
-import mpmath
-import math
-import os
-import sys
-import pathlib
+import csv
 
-def efromT(T, P, atom_spec, g, Eu, Au, El):
-    path = pathlib.Path(__file__).parent.absolute()
-    numfract = os.popen('''export MPP_DIRECTORY='''+str(path)+'''/Mutationpp
-          export MPP_DATA_DIRECTORY=$MPP_DIRECTORY/data
-          export PATH=$MPP_DIRECTORY/install/bin:$PATH
-          export LD_LIBRARY_PATH=$MPP_DIRECTORY/install/lib:$LD_LIBRARY_PATH
-          '''+str(path)+'''/Mutationpp/src/general/mppequil --no-header -T ''' + str(T) + ''' -P ''' + str(P) + ''' -m 4 -s 0 plasmatron''').read().split()
-    n = float(numfract[0])
-    if atom_spec == 'O':
-        XO = float(numfract[12])
-        ng = n*XO
-        partfunc = open("O.res","r")
-        Qtab = partfunc.read().splitlines()
-        partfunc.close()
-    elif atom_spec == 'N':
-        XN = float(numfract[11])
-        ng = n*XN
-        partfunc = open("N.res","r")
-        Qtab = partfunc.read().splitlines()
-        partfunc.close()
-    else:
-        sys.exit("atom_spec must be 'O' or 'N' !")
-    Tdown = float(Qtab[0].split()[0])
+
+def efromSpectr(start, end):
+    wl = []
+    I = []
+    with open('ps100mbar_T7000K_lambda300-900nm.csv') as csvfile:
+        data = csv.reader(csvfile, quoting=csv.QUOTE_NONNUMERIC)
+        for row in data:
+            wl.append(row[0])
+            I.append(row[1])
+    wl.pop(0)
+    I.pop(0)
+    #find closest to start and end
     i = 0
-    while Tdown > T:
+    while wl[i] < start:
         i = i + 1
-        Tdown = float(Qtab[i].split()[0])
-    Tup = float(Qtab[i-1].split()[0])
-    ratio = (T-Tdown)/(Tup-Tdown)
-    Qint = float(Qtab[i].split()[1])*(1-ratio) + float(Qtab[i-1].split()[1])*ratio
-    Kb = 1.38064852E-23
-    ecalc = 0
-    for i in range(len(g)):
-        nu = ng*g[i]*mpmath.exp(-Eu[i]/(Kb*T))/Qint
-        e = (Eu[i]-El[i])/(4*math.pi) * Au[i]*nu
-        ecalc = ecalc + e
-    return ecalc
+    #wl(i) >= start
+    if wl[i] - start < start - wl[i-1]:
+        start = wl[i]
+        starti = i
+    else:
+        start = wl[i-1]
+        starti = i-1
+    while wl[i] < end:
+        i = i + 1
+    #wl(i) >= end
+    if wl[i] - end < end - wl[i-1]:
+        end = wl[i]
+        endi = i
+    else:
+        end = wl[i-1]
+        endi = i-1
+    
+    emeas = 0
+    for i in range(starti, endi):
+        baseline1 = I[starti] + (wl[i]-start)/(end-start)*(I[endi]-I[starti])
+        baseline2 = I[starti] + (wl[i+1]-start)/(end-start)*(I[endi]-I[starti])
+        emeas = emeas + ((I[i]-baseline1 + I[i+1]-baseline2)*(wl[i+1]-wl[i])/2) #(B+b)*h/2
+    return emeas
+
+
+def Tcalc(e, atomLines, P):
+    #Guess
+    T = 7000 #[K]
+    err = 1000
+    while abs(err) > 1E-3:
+        ecalc = atomLines.emission(T, P)
+        err = e - ecalc
+        eta = 0.8
+        T = T + eta*err
+    return T
