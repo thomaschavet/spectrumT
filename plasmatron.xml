@@ -1,4 +1,5 @@
-<mixture mechanism="Mars_19_Park" thermo_db="RRHO">
+<!-- Mixture of TACOT and air species -->
+<mixture thermo_db="NASA-9" >
 
     <species>
         e- C+ N+ O+ N2+ O2+ CN+ CO+ NO+ C N O C2 N2 O2 CN CO NO CO2
@@ -9,4 +10,3 @@
     </element_compositions>
 
 </mixture>
-
