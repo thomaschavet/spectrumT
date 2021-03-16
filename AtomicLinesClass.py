@@ -1,8 +1,6 @@
 import mpmath
 import math
-import os
 import sys
-import pathlib
 
 class atomLines:
     #inputs must be [list] but can also be a single variable if it is the same for all lines
@@ -44,17 +42,43 @@ class atomLines:
             self.Au = [myAu for i in range(len(self.g))]
     
     def emission(self, T, P):
-        #run mutationpp
-        path = pathlib.Path(__file__).parent.absolute()
-        numfract = os.popen('''export MPP_DIRECTORY='''+str(path)+'''/Mutationpp
-              export MPP_DATA_DIRECTORY=$MPP_DIRECTORY/data
-              '''+str(path)+'''/Mutationpp/src/general/mppequil --no-header -T ''' + str(T) + ''' -P ''' + str(P) + ''' -m 4 -s 0 plasmatron''').read().split()
-        n = float(numfract[0])
+        #search for the value in 2D table of data from mutationpp
+        file = open("PopTab.txt","r")
+        nTab = file.read().splitlines()
+        file.close()
+        Pup = float(nTab[0].split()[1])
+        i = 1
+        while Pup < P:
+            i = i + 1
+            Pup = float(nTab[0].split()[i])
+        Pdown = float(nTab[0].split()[i-1])
+        ratioP = (P-Pup)/(Pdown-Pup)
+        Tup = float(nTab[1].split()[0])
+        j = 1
+        while Tup < T:
+            j = j + 1
+            Tup = float(nTab[j].split()[0])
+        Tdown = float(nTab[j-1].split()[0])
+        ratioT = (T-Tup)/(Tdown-Tup)
+        nup = float(nTab[j].split()[i])*(1-ratioT) + float(nTab[j-1].split()[i])*ratioT
+        ndown = float(nTab[j].split()[i-1])*(1-ratioT) + float(nTab[j-1].split()[i-1])*ratioT
+        n = nup*(1-ratioP) + ndown*ratioP
+        
         if self.atom == 'O':
-            XO = float(numfract[12])
+            file = open("PopOTab.txt","r")
+            OTab = file.read().splitlines()
+            file.close()
+            Oup = float(OTab[j].split()[i])*(1-ratioT) + float(OTab[j-1].split()[i])*ratioT
+            Odown = float(OTab[j].split()[i-1])*(1-ratioT) + float(OTab[j-1].split()[i-1])*ratioT
+            XO = Oup*(1-ratioP) + Odown*ratioP
             ng = n*XO
         elif self.atom == 'N':
-            XN = float(numfract[11])
+            file = open("PopNTab.txt","r")
+            NTab = file.read().splitlines()
+            file.close()
+            Nup = float(NTab[j].split()[i])*(1-ratioT) + float(NTab[j-1].split()[i])*ratioT
+            Ndown = float(NTab[j].split()[i-1])*(1-ratioT) + float(NTab[j-1].split()[i-1])*ratioT
+            XN = Nup*(1-ratioP) + Ndown*ratioP
             ng = n*XN
         else:
             sys.exit("atom_spec must be 'O' or 'N' !")
