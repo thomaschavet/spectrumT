@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import astropy.units as u
 import spectrum
+from matplotlib import cm
 
 class measurement:
     def __init__(self):#maybe put name of file in input
@@ -53,7 +54,16 @@ class measurement:
             num = str(i)
             frame = spectrum2D('FS_x2_500-710_calib/gain4_bg-SG-700-910-Step-1-raw-Frame-'+num+'.spc')
             calibBGintensity.append(frame.intensity)
-        
+        '''
+        pixels = []
+        for j in range(9):
+            pixel  = []
+            for i in range(9):
+                pixel.append(intensity[i][j][0].value)
+            pixels.append(pixel)
+        plt.plot(pixels)
+        plt.show()
+        '''
         #computes mean values
         self.meanU = [[0 for col in range(len_wl)] for row in range(len_y)]
         for i in range(len(intensity)):
@@ -104,6 +114,7 @@ class measurement:
             Lup = L[i-1][0]
             ratio = (wl.value-Ldown)/(Lup-Ldown)
             self.Lcalib.append(L[i][1]*(1-ratio) + L[i-1][1]*ratio)
+        self.Lcalib = self.Lcalib * u.W/(u.m**3*u.sr)#u.kg/(u.m*u.s**3)
         #r = 0.21
         #Lcalib = np.array(Lcalib)
         #print(Lcalib)
@@ -116,7 +127,6 @@ class measurement:
     def calibration(self):
         Smeas = self.meanU-self.meanBG
         Scalib = self.calibmeanU-self.calibmeanBG
-        
         #profile = self.spectralIntegration(Smeas,lambda_a,lambda_b)
         #abel_obj = abel1D.AbelInversion1D(profile)
         #profile_inverted = abel_obj.invert()
@@ -135,7 +145,11 @@ class measurement:
         #print(Scalib)
         #print(dtcalib)
         #print(Lcalib)
-        Lmeas = (Smeas*(1/self.dtmeas))*(Scalib[512]*(1/self.dtcalib))**-1 *self.Lcalib
+        meanScalib = [0 for i in range(len(Scalib[530]))]
+        for i in range(530,540):
+            meanScalib = meanScalib + Scalib[i]
+        meanScalib = meanScalib/10
+        Lmeas = (Smeas*(1/self.dtmeas))*(Scalib[535]*(1/self.dtcalib))**-1 *self.Lcalib.to(u.W/(u.m**2*u.nm*u.sr))
         #print(Lmeas)
         #plt.imshow(Scalib*(1/u.ct))
         #plt.show()
@@ -168,3 +182,42 @@ class measurement:
         profile = spectrum.spatialIntensity(r = y, intensity = intensity)
         
         return profile
+    
+    def plot2D(self, intensity):
+        
+        x_plt = self.wavelength
+
+        n = intensity.shape[0]
+        y_plt = np.linspace(0, n - 1, n) * u.pix
+        z_plt = intensity
+        
+        xx, yy = np.meshgrid(x_plt.value, y_plt.value)
+        
+#        title_label = 'x = %.1f mm' % (self.x_coord)
+        title_label = ''
+        
+        extent = [0 , 1, 
+                  0 , 1]
+        
+        extent = [x_plt.value[0], x_plt.value[-1], 
+                  y_plt.value[-1], y_plt.value[0]]
+
+
+        plt.figure()
+            
+
+        
+        plt.imshow(z_plt.value, 
+                    cmap = cm.nipy_spectral,  
+                    aspect= 'auto', 
+                    extent = extent,
+                    # norm=LogNorm()
+                    )
+        cbar = plt.colorbar()
+        cbar.set_label('Intensity, ' + z_plt.unit.to_string())
+
+        plt.xlabel('Wavelength, ' +self.wavelength.unit.to_string())
+        plt.ylabel('y' +  ', ' + y_plt.unit.to_string())
+        plt.title(title_label)
+      
+        plt.show()
