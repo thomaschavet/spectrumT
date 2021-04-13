@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import astropy.units as u
 import spectrum
 from matplotlib import cm
+from RandVarClass import randVar
 
 class measurement:
     def __init__(self):#maybe put name of file in input
@@ -22,10 +23,6 @@ class measurement:
         len_wl = len(frame.intensity[0])
         frame = spectrum2D('FS_x2_500-710_calib/gain4-SG-700-910-Step-1-raw-Frame-01.spc')
         self.dtcalib = frame.gate_time
-        #wavelength = frame.wavelength
-        #frame = spectrum2D('FS_x2_500-710/FS_x2_bg_  32.spc')
-        #dtcalib = frame.gate_time
-        
         
         #Open file and store resuts in "intensity"
         intensity = []
@@ -104,6 +101,7 @@ class measurement:
         calibvarBG = calibvarBG/len(calibBGintensity)
         calibvarBG = calibvarBG**(1/2)
         
+        #Interpolate L from file for each wavelength
         self.Lcalib = []
         for wl in self.wavelength:
             Ldown = L[0][0]
@@ -113,46 +111,31 @@ class measurement:
                  Ldown = L[i][0]
             Lup = L[i-1][0]
             ratio = (wl.value-Ldown)/(Lup-Ldown)
-            self.Lcalib.append(L[i][1]*(1-ratio) + L[i-1][1]*ratio)
-        self.Lcalib = self.Lcalib * u.W/(u.m**3*u.sr)#u.kg/(u.m*u.s**3)
-        #r = 0.21
-        #Lcalib = np.array(Lcalib)
-        #print(Lcalib)
-        #self.matLcalib = []
-        #for i in range(len(self.meanU)):
-            #y = -r + i*2*r/len(self.meanU)
-            #x = 2*(r**2-y**2)**(1/2)
-            #self.matLcalib.append(Lcalib)
+            meanL = (L[i][1]*(1-ratio) + L[i-1][1]*ratio) * u.W/(u.m**3*u.sr)#u.kg/(u.m*u.s**3)
+            meanL = meanL.to(u.W/(u.m**2*u.nm*u.sr)).value
+            errL = L[i][2]*(1-ratio) + L[i-1][2]*ratio
+            self.Lcalib.append(randVar(meanL,errL))
     
-    def calibration(self):
+    def calibration(self,Lbound):
         Smeas = self.meanU-self.meanBG
         Scalib = self.calibmeanU-self.calibmeanBG
-        #profile = self.spectralIntegration(Smeas,lambda_a,lambda_b)
-        #abel_obj = abel1D.AbelInversion1D(profile)
-        #profile_inverted = abel_obj.invert()
-        #Smeas = profile_inverted.intensity
         
-        #profile = self.spectralIntegration(Scalib,lambda_a,lambda_b)
-        #abel_obj = abel1D.AbelInversion1D(profile)
-        #profile_inverted = abel_obj.invert()
-        #Scalib = profile_inverted.intensity
-        #profile_inverted.plot()
-        #plt.plot(profile_inverted.intensity)
-        #plt.show()
-        
-        #print(Smeas)
-        #print(dtmeas)
-        #print(Scalib)
-        #print(dtcalib)
-        #print(Lcalib)
+        #computes Scalib that is the signal directly measured by the plasma lamp (the lamp is at lines 530 to 540)
         meanScalib = [0 for i in range(len(Scalib[530]))]
         for i in range(530,540):
             meanScalib = meanScalib + Scalib[i]
         meanScalib = meanScalib/10
-        Lmeas = (Smeas*(1/self.dtmeas))*(Scalib[535]*(1/self.dtcalib))**-1 *self.Lcalib.to(u.W/(u.m**2*u.nm*u.sr))
-        #print(Lmeas)
-        #plt.imshow(Scalib*(1/u.ct))
-        #plt.show()
+        
+        #computes a random Lcalib from data : mean value and err
+        randLcalib = []
+        for i in range(len(self.Lcalib)):
+            if Lbound == 'mean':
+                randLcalib.append(self.Lcalib[i].mean())
+            if Lbound == 'up':
+                randLcalib.append(self.Lcalib[i].max)
+            if Lbound == 'down':
+                randLcalib.append(self.Lcalib[i].min)
+        Lmeas = (Smeas*(1/self.dtmeas))*(meanScalib*(1/self.dtcalib))**-1 *randLcalib
         return Lmeas
     
     def spectralIntegration(self, intensity, lambda_a, lambda_b, baseline_subtraction = False):
