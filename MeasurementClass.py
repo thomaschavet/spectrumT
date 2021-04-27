@@ -6,6 +6,7 @@ import astropy.units as u
 import spectrum
 from matplotlib import cm
 from RandVarClass import randVar
+import numpy as np
 
 class measurement:
     def __init__(self):#maybe put name of file in input
@@ -25,29 +26,29 @@ class measurement:
         self.dtcalib = frame.gate_time
         
         #Open file and store resuts in "intensity"
-        intensity = []
-        for i in range(1,10):
+        self.intensity = []
+        for i in range(1,11):
             if i < 10:
                 num = '0' + str(i)
             else:
                 num = str(i)
             frame = spectrum2D('FS_x2_500-710/FS_x2_  33-SG-700-910-Step-1-raw-Frame-'+num+'.spc')
-            intensity.append(frame.intensity)
+            self.intensity.append(frame.intensity)
         BGintensity = []
-        for i in range(1,5):
+        for i in range(1,6):
             num = str(i)
             frame = spectrum2D('FS_x2_500-710/FS_x2_bg_  33-SG-700-910-Step-1-raw-Frame-'+num+'.spc')
             BGintensity.append(frame.intensity)
-        calibintensity = []
-        for i in range(1,10):
+        self.calibintensity = []
+        for i in range(1,11):
             if i < 10:
                 num = '0' + str(i)
             else:
                 num = str(i)
             frame = spectrum2D('FS_x2_500-710_calib/gain4-SG-700-910-Step-1-raw-Frame-'+num+'.spc')
-            calibintensity.append(frame.intensity)
+            self.calibintensity.append(frame.intensity)
         calibBGintensity = []
-        for i in range(1,5):
+        for i in range(1,6):
             num = str(i)
             frame = spectrum2D('FS_x2_500-710_calib/gain4_bg-SG-700-910-Step-1-raw-Frame-'+num+'.spc')
             calibBGintensity.append(frame.intensity)
@@ -56,34 +57,35 @@ class measurement:
         for j in range(9):
             pixel  = []
             for i in range(9):
-                pixel.append(intensity[i][j][0].value)
+                pixel.append(self.intensity[i][j][0].value)
             pixels.append(pixel)
         plt.plot(pixels)
         plt.show()
         '''
         #computes mean values
         self.meanU = [[0 for col in range(len_wl)] for row in range(len_y)]
-        for i in range(len(intensity)):
-            self.meanU = self.meanU + intensity[i]
-        self.meanU = self.meanU/len(intensity)
+        for i in range(len(self.intensity)):
+            self.meanU = self.meanU + self.intensity[i]
+        self.meanU = self.meanU/len(self.intensity)
         self.meanBG = [[0 for col in range(len_wl)] for row in range(len_y)]
         for i in range(len(BGintensity)):
             self.meanBG = self.meanBG + BGintensity[i]
         self.meanBG = self.meanBG/len(BGintensity)
         self.calibmeanU = [[0 for col in range(len_wl)] for row in range(len_y)]
-        for i in range(len(calibintensity)):
-            self.calibmeanU = self.calibmeanU + calibintensity[i]
-        self.calibmeanU = self.calibmeanU/len(calibintensity)
+        for i in range(len(self.calibintensity)):
+            self.calibmeanU = self.calibmeanU + self.calibintensity[i]
+        self.calibmeanU = self.calibmeanU/len(self.calibintensity)
         self.calibmeanBG = [[0 for col in range(len_wl)] for row in range(len_y)]
         for i in range(len(calibBGintensity)):
             self.calibmeanBG = self.calibmeanBG + calibBGintensity[i]
         self.calibmeanBG = self.calibmeanBG/len(calibBGintensity)
         
+        '''
         #computes variances
         varU = [[0 for col in range(len_wl)] for row in range(len_y)]
-        for i in range(len(intensity)):
-            varU = varU + (intensity[i]-self.meanU)**2
-        varU = varU/len(intensity)
+        for i in range(len(self.intensity)):
+            varU = varU + (self.intensity[i]-self.meanU)**2
+        varU = varU/len(self.intensity)
         varU = varU**(1/2)
         varBG = [[0 for col in range(len_wl)] for row in range(len_y)]
         for i in range(len(BGintensity)):
@@ -91,15 +93,16 @@ class measurement:
         varBG = varBG/len(BGintensity)
         varBG = varBG**(1/2)
         calibvarU = [[0 for col in range(len_wl)] for row in range(len_y)]
-        for i in range(len(calibintensity)):
-            calibvarU = calibvarU + (calibintensity[i]-self.calibmeanU)**2
-        calibvarU = calibvarU/len(calibintensity)
+        for i in range(len(self.calibintensity)):
+            calibvarU = calibvarU + (self.calibintensity[i]-self.calibmeanU)**2
+        calibvarU = calibvarU/len(self.calibintensity)
         calibvarU = calibvarU**(1/2)
         calibvarBG = [[0 for col in range(len_wl)] for row in range(len_y)]
         for i in range(len(calibBGintensity)):
             calibvarBG = calibvarBG + (calibBGintensity[i]-self.calibmeanBG)**2
         calibvarBG = calibvarBG/len(calibBGintensity)
         calibvarBG = calibvarBG**(1/2)
+        '''
         
         #Interpolate L from file for each wavelength
         self.Lcalib = []
@@ -116,9 +119,24 @@ class measurement:
             errL = L[i][2]*(1-ratio) + L[i-1][2]*ratio
             self.Lcalib.append(randVar(meanL,errL))
     
-    def calibration(self,Lbound):
-        Smeas = self.meanU-self.meanBG
-        Scalib = self.calibmeanU-self.calibmeanBG
+    def calibration(self,Lbound, nframe, ncalibframe, mu='none', sigma='none'):
+        if nframe == 0:
+            image = self.meanU
+        else:
+            image = self.intensity[nframe-1]
+        if ncalibframe == 0:
+            calibimage = self.calibmeanU
+        else:
+            calibimage = self.calibintensity[nframe-1]
+        
+        if mu == 'none' and sigma == 'none':
+            Smeas = image-self.meanBG
+            Scalib = calibimage-self.calibmeanBG
+        else:
+            genBG = np.random.normal(mu, sigma, [len(self.meanBG),len(self.meanBG[0])]) *u.ct
+            Smeas = image-genBG
+            genBG = np.random.normal(mu, sigma, [len(self.calibmeanBG),len(self.calibmeanBG[0])]) *u.ct
+            Scalib = calibimage-genBG
         
         #computes Scalib that is the signal directly measured by the plasma lamp (the lamp is at lines 530 to 540)
         meanScalib = [0 for i in range(len(Scalib[530]))]
@@ -135,6 +153,8 @@ class measurement:
                 randLcalib.append(self.Lcalib[i].max)
             if Lbound == 'down':
                 randLcalib.append(self.Lcalib[i].min)
+            if Lbound == 'rand':
+                randLcalib.append(self.Lcalib[i].rand())
         Lmeas = (Smeas*(1/self.dtmeas))*(meanScalib*(1/self.dtcalib))**-1 *randLcalib
         return Lmeas
     
