@@ -44,9 +44,15 @@ def Tcalc(e, atomLines, P):
     #Guess
     T = 7000 #[K]
     err = 1000
+    newerr = 0
+    eta = 0.8
     while abs(err) > 1E-3:
         ecalc = atomLines.emission(T, P)
-        err = e - ecalc
-        eta = 0.8
+        newerr = e - ecalc
+        if (newerr>=0 and err>=0) or (newerr<0 and err<0):
+            eta = eta + eta*0.5
+        else:
+            eta = eta - eta*0.2
+        err = newerr
         T = T + eta*err
     return T
