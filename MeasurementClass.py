@@ -80,52 +80,59 @@ class measurement:
             self.calibmeanBG = self.calibmeanBG + calibBGintensity[i]
         self.calibmeanBG = self.calibmeanBG/len(calibBGintensity)
         
-        '''
-        #computes variances
-        varU = [[0 for col in range(len_wl)] for row in range(len_y)]
+        #computes standard deviation
+        self.stdU = [[0 for col in range(len_wl)] for row in range(len_y)]
         for i in range(len(self.intensity)):
-            varU = varU + (self.intensity[i]-self.meanU)**2
-        varU = varU/len(self.intensity)
-        varU = varU**(1/2)
-        varBG = [[0 for col in range(len_wl)] for row in range(len_y)]
-        for i in range(len(BGintensity)):
-            varBG = varBG + (BGintensity[i]-self.meanBG)**2
-        varBG = varBG/len(BGintensity)
-        varBG = varBG**(1/2)
-        calibvarU = [[0 for col in range(len_wl)] for row in range(len_y)]
+            self.stdU = self.stdU + (self.intensity[i]-self.meanU)**2
+        self.stdU = self.stdU/len(self.intensity)
+        self.stdU = self.stdU**(1/2)
+        self.calibstdU = [[0 for col in range(len_wl)] for row in range(len_y)]
         for i in range(len(self.calibintensity)):
-            calibvarU = calibvarU + (self.calibintensity[i]-self.calibmeanU)**2
-        calibvarU = calibvarU/len(self.calibintensity)
-        calibvarU = calibvarU**(1/2)
-        calibvarBG = [[0 for col in range(len_wl)] for row in range(len_y)]
-        for i in range(len(calibBGintensity)):
-            calibvarBG = calibvarBG + (calibBGintensity[i]-self.calibmeanBG)**2
-        calibvarBG = calibvarBG/len(calibBGintensity)
-        calibvarBG = calibvarBG**(1/2)
-        '''
+            self.calibstdU = self.calibstdU + (self.calibintensity[i]-self.calibmeanU)**2
+        self.calibstdU = self.calibstdU/len(self.calibintensity)
+        self.calibstdU = self.calibstdU**(1/2)
         
         #Interpolate L from file for each wavelength
         self.Lcalib = []
-        for wl in self.wavelength:
+        self.vectmeanL = []
+        #self.covL = np.ones([len(self.wavelength),len(self.wavelength)])
+        stdDev = []
+        for j in range(len(self.wavelength)):
             Ldown = L[0][0]
             i = 0
-            while Ldown < wl.value:
+            while Ldown < self.wavelength[j].value:
                  i = i + 1
                  Ldown = L[i][0]
             Lup = L[i-1][0]
-            ratio = (wl.value-Ldown)/(Lup-Ldown)
+            ratio = (self.wavelength[j].value-Ldown)/(Lup-Ldown)
             meanL = (L[i][1]*(1-ratio) + L[i-1][1]*ratio) * u.W/(u.m**3*u.sr)#u.kg/(u.m*u.s**3)
             meanL = meanL.to(u.W/(u.m**2*u.nm*u.sr)).value
             errL = L[i][2]*(1-ratio) + L[i-1][2]*ratio
+            self.vectmeanL.append(meanL)
+            stdDev.append(errL/2) #err is 2*standard deviation
             self.Lcalib.append(randVar(meanL,errL))
+        stdDev = np.array(stdDev)
+        self.covL = np.outer(stdDev,stdDev.T)
     
     def calibration(self,Lbound, nframe, ncalibframe, mu='none', sigma='none'):
         if nframe == 0:
             image = self.meanU
+        elif nframe < 0:
+            '''
+            image = []
+            for i in range(len(self.meanU)):
+                image.append([np.random.normal(self.meanU[i][j].value,self.stdU[i][j].value) for j in range(len(self.meanU[i]))])
+            image = image *u.ct
+            '''
+            stddev = np.random.normal(0, 1, [len(self.meanU),len(self.meanU[0])])
+            image = self.meanU + np.multiply(stddev,self.stdU)
         else:
             image = self.intensity[nframe-1]
         if ncalibframe == 0:
             calibimage = self.calibmeanU
+        elif ncalibframe < 0:
+            stddev = np.random.normal(0, 1, [len(self.calibmeanU),len(self.calibmeanU[0])])
+            image = self.calibmeanU + np.multiply(stddev,self.calibstdU)
         else:
             calibimage = self.calibintensity[nframe-1]
         
@@ -155,6 +162,9 @@ class measurement:
                 randLcalib.append(self.Lcalib[i].min)
             if Lbound == 'rand':
                 randLcalib.append(self.Lcalib[i].rand())
+        if Lbound == 'randcorr':#random correleted
+            randLcalib = np.random.multivariate_normal(self.vectmeanL, self.covL)
+        
         Lmeas = (Smeas*(1/self.dtmeas))*(meanScalib*(1/self.dtcalib))**-1 *randLcalib
         return Lmeas
     
